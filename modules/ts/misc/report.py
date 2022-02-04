@@ -37,8 +37,7 @@ if __name__ == "__main__":
     files = []
     for arg in set(args):
         try:
-            cases = testlog_parser.parseLogFile(arg)
-            if cases:
+            if cases := testlog_parser.parseLogFile(arg):
                 files.append(os.path.basename(arg))
                 tests.extend(cases)
         except:

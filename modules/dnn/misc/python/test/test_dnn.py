@@ -254,9 +254,10 @@ class dnn_test(NewOpenCVTests):
 
             # Generate inputs
             numInputs = 10
-            inputs = []
-            for _ in range(numInputs):
-                inputs.append(np.random.standard_normal([2, 6, 75, 113]).astype(np.float32))
+            inputs = [
+                np.random.standard_normal([2, 6, 75, 113]).astype(np.float32)
+                for _ in range(numInputs)
+            ]
 
             # Run synchronously
             refs = []

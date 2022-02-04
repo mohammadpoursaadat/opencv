@@ -7,7 +7,7 @@ from run_suite import TestSuite
 
 
 def exe(program):
-    return program + ".exe" if hostos == 'nt' else program
+    return f'{program}.exe' if hostos == 'nt' else program
 
 
 class ApkInfo:
@@ -112,10 +112,10 @@ class AndroidTestSuite(TestSuite):
         self.env = android_env
 
     def isTest(self, fullpath):
-        if os.path.isfile(fullpath):
-            if fullpath.endswith(".apk") or os.access(fullpath, os.X_OK):
-                return True
-        return False
+        return bool(
+            os.path.isfile(fullpath)
+            and (fullpath.endswith(".apk") or os.access(fullpath, os.X_OK))
+        )
 
     def getOS(self):
         return self.adb.getOSIdentifier()
@@ -140,7 +140,6 @@ class AndroidTestSuite(TestSuite):
 
             params = ["-e package %s" % info.pkg_target]
             ret = self.adb.run(["shell", "am instrument -w %s %s/%s" % (" ".join(params), info.pkg_name, info.pkg_runner)])
-            return None, ret
         else:
             device_dir = getpass.getuser().replace(" ", "") + "_" + self.options.mode + "/"
             if isColorEnabled(args):
@@ -150,7 +149,7 @@ class AndroidTestSuite(TestSuite):
             exename = os.path.basename(exe)
             android_exe = android_dir + exename
             self.adb.run(["push", exe, android_exe])
-            self.adb.run(["shell", "chmod 777 " + android_exe])
+            self.adb.run(["shell", f'chmod 777 {android_exe}'])
             env_pieces = ["export %s=%s" % (a, b) for a, b in self.env.items()]
             pieces = ["cd %s" % android_dir, "./%s %s" % (exename, " ".join(args))]
             log.warning("Run: %s" % " && ".join(pieces))
@@ -159,11 +158,12 @@ class AndroidTestSuite(TestSuite):
             hostlogpath = os.path.join(workingDir, logfile)
             self.adb.run(["pull", android_dir + logfile, hostlogpath])
             # cleanup
-            self.adb.run(["shell", "rm " + android_dir + logfile])
-            self.adb.run(["shell", "rm " + tempdir + "__opencv_temp.*"], silent=True)
+            self.adb.run(["shell", f'rm {android_dir}{logfile}'])
+            self.adb.run(["shell", f'rm {tempdir}__opencv_temp.*'], silent=True)
             if os.path.isfile(hostlogpath):
                 return hostlogpath, ret
-            return None, ret
+
+        return None, ret
 
 
 if __name__ == "__main__":

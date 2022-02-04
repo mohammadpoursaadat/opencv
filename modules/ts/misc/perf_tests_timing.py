@@ -50,8 +50,7 @@ if __name__ == "__main__":
 
             test_sets = []
             try:
-                tests = testlog_parser.parseLogFile(file)
-                if tests:
+                if tests := testlog_parser.parseLogFile(file):
                     test_sets.append((os.path.basename(file), tests))
             except IOError as err:
                 sys.stderr.write("IOError reading \"" + file + "\" - " + str(err) + os.linesep)
@@ -84,7 +83,7 @@ if __name__ == "__main__":
                 groupName = next(c for c in cases if c).shortName()
                 if groupName != prevGroupName:
                     if prevGroupName != None:
-                        suit_time = suit_time/60 #from seconds to minutes
+                        suit_time /= 60
                         testsuits.append({'module': module_name, 'name': prevGroupName, \
                             'time': suit_time, 'num': suit_num, 'failed': fails_num})
                         overall_time += suit_time
@@ -95,7 +94,7 @@ if __name__ == "__main__":
 
                 for i in range(setsCount):
                     case = cases[i]
-                    if not case is None:
+                    if case is not None:
                         suit_num += 1
                         if case.get('status') == 'run':
                             suit_time += case.get('time')
@@ -103,12 +102,12 @@ if __name__ == "__main__":
                             fails_num += 1
 
             # last testsuit processing
-            suit_time = suit_time/60
+            suit_time /= 60
             testsuits.append({'module': module_name, 'name': prevGroupName, \
                 'time': suit_time, 'num': suit_num, 'failed': fails_num})
             overall_time += suit_time
 
-    if len(testsuits)==0:
+    if not testsuits:
         exit(0)
 
     tbl = table()
@@ -148,7 +147,6 @@ if __name__ == "__main__":
                 tbl.newCell('failed', suit['failed'])
                 rows += 1
 
-    # output table
     if rows:
         if options.generateHtml:
             tbl.htmlPrintTable(sys.stdout)

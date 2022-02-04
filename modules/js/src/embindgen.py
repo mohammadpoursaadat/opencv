@@ -313,9 +313,9 @@ class ArgInfo(object):
                 self.tp = "const std::vector<cv::Mat>&"
         self.tp = handle_vector(self.tp).strip()
         if self.const:
-            self.tp = "const " + self.tp
+            self.tp = f'const {self.tp}'
         if self.reference:
-            self.tp = self.tp + "&"
+            self.tp = f'{self.tp}&'
         self.py_inputarg = False
         self.py_outputarg = False
 
@@ -340,8 +340,7 @@ class FuncVariant(object):
             ainfo = ArgInfo(a)
             if ainfo.isarray and not ainfo.arraycvt:
                 c = ainfo.arraylen
-                c_arrlist = self.array_counters.get(c, [])
-                if c_arrlist:
+                if c_arrlist := self.array_counters.get(c, []):
                     c_arrlist.append(ainfo.name)
                 else:
                     self.array_counters[c] = [ainfo.name]
@@ -505,9 +504,8 @@ class JSWrapperGenerator(object):
         func.add_variant(variant)
 
     def save(self, path, name, buf):
-        f = open(path + "/" + name, "wt")
-        f.write(buf.getvalue())
-        f.close()
+        with open(f'{path}/{name}', "wt") as f:
+            f.write(buf.getvalue())
 
     def gen_function_binding_with_wrapper(self, func, class_info):
 

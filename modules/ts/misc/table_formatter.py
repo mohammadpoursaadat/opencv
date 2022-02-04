@@ -42,7 +42,6 @@ class table(object):
         self.rows = []
         self.ridx = -1;
         self.caption = caption
-        pass
 
     def newRow(self, **properties):
         if len(self.rows) - 1 == self.ridx:
@@ -59,10 +58,7 @@ class table(object):
             self.ridx = len(self.rows) - 1
 
     def newColumn(self, name, caption, title = None, **properties):
-        if name in self.columns:
-            index = self.columns[name].index
-        else:
-            index = len(self.columns)
+        index = self.columns[name].index if name in self.columns else len(self.columns)
         if isinstance(caption, tblColumn):
             caption.index = index
             self.columns[name] = caption
@@ -76,10 +72,8 @@ class table(object):
     def getColumn(self, name):
         if isinstance(name, str):
             return self.columns.get(name, None)
-        else:
-            vals = [v for v in self.columns.values() if v.index == name]
-            if vals:
-                return vals[0]
+        if vals := [v for v in self.columns.values() if v.index == name]:
+            return vals[0]
         return None
 
     def newCell(self, col_name, text, value = None, **properties):
@@ -89,10 +83,7 @@ class table(object):
         row = self.rows[self.ridx]
         if not col:
             return None
-        if isinstance(text, tblCell):
-            cl = text
-        else:
-            cl = tblCell(text, value, properties)
+        cl = text if isinstance(text, tblCell) else tblCell(text, value, properties)
         row.cells[col.index] = cl
         return cl
 
@@ -148,7 +139,7 @@ class table(object):
                     row.minheight = cell.height
 
         self.ridx = len(self.rows) - 1
-        for r in range(rowsToAppend):
+        for _ in range(rowsToAppend):
             self.newRow()
             self.rows[len(self.rows) - 1].minheight = 1
 
@@ -156,12 +147,16 @@ class table(object):
             colspanned_new = []
             for r, c in colspanned:
                 cell = self.rows[r].cells[c]
-                sum([col.minwidth for col in columns[c:c + cell.colspan]])
-                cell.awailable = sum([col.minwidth for col in columns[c:c + cell.colspan]]) + cell.colspan - 1
+                sum(col.minwidth for col in columns[c:c + cell.colspan])
+                cell.awailable = (
+                    sum(col.minwidth for col in columns[c : c + cell.colspan])
+                    + cell.colspan
+                    - 1
+                )
+
                 if cell.awailable < cell.width:
                     colspanned_new.append((r,c))
-            colspanned = colspanned_new
-            if colspanned:
+            if colspanned := colspanned_new:
                 r,c = colspanned[0]
                 cell = self.rows[r].cells[c]
                 cols = columns[c:c + cell.colspan]
@@ -179,11 +174,10 @@ class table(object):
             rowspanned_new = []
             for r, c in rowspanned:
                 cell = self.rows[r].cells[c]
-                cell.awailable = sum([row.minheight for row in self.rows[r:r + cell.rowspan]])
+                cell.awailable = sum(row.minheight for row in self.rows[r:r + cell.rowspan])
                 if cell.awailable < cell.height:
                     rowspanned_new.append((r,c))
-            rowspanned = rowspanned_new
-            if rowspanned:
+            if rowspanned := rowspanned_new:
                 r,c = rowspanned[0]
                 cell = self.rows[r].cells[c]
                 rows = self.rows[r:r + cell.rowspan]
@@ -220,7 +214,7 @@ class table(object):
         return vstr.splitlines()
 
     def adjustColWidth(self, cols, width):
-        total = sum([c.minWidth for c in cols])
+        total = sum(c.minWidth for c in cols)
         if total + len(cols) - 1 >= width:
             return
         budget = width - len(cols) + 1 - total
@@ -239,15 +233,12 @@ class table(object):
             except AttributeError:
                 pass
             try:
-                val = el.props[name]
-                if val:
+                if val := el.props[name]:
                     return val
-            except AttributeError:
-                pass
-            except KeyError:
+            except (AttributeError, KeyError):
                 pass
         try:
-            return getattr(self.__class__, "def_" + name)
+            return getattr(self.__class__, f'def_{name}')
         except AttributeError:
             return None
 
@@ -264,7 +255,7 @@ class table(object):
 
         self.consolePrintRow2(colrizer, headerRow, columns)
 
-        for i in range(0, len(self.rows)):
+        for i in range(len(self.rows)):
             self.consolePrintRow2(colrizer, i, columns)
 
     def consolePrintRow2(self, out, r, columns):
@@ -280,12 +271,9 @@ class table(object):
             cell = row.cells[i]
             colspan = self.getValue("colspan", cell)
             if cell is not None:
-                cell.wspace = sum([col.minwidth for col in columns[i:i + colspan]]) + colspan - 1
+                cell.wspace = sum(col.minwidth for col in columns[i:i + colspan]) + colspan - 1
                 if cell.line is None:
-                    if r < 0:
-                        rows = [row]
-                    else:
-                        rows = self.rows[r:r + self.getValue("rowspan", cell)]
+                    rows = [row] if r < 0 else self.rows[r:r + self.getValue("rowspan", cell)]
                     cell.line = self.evalLine(cell, rows, columns[i])
                     if len(rows) > 1:
                         for rw in rows:
@@ -297,10 +285,10 @@ class table(object):
             out.write("|")
             for c in row.cells:
                 text = ' '.join(self.getValue('text', c) or [])
-                out.write(text + "|")
+                out.write(f'{text}|')
             out.write(os.linesep)
         else:
-            for ln in range(row.minheight):
+            for _ in range(row.minheight):
                 i = 0
                 while i < len(row.cells):
                     if i > 0:
@@ -350,7 +338,7 @@ class table(object):
     def evalLine(self, cell, rows, column):
         height = cell.height
         valign = self.getValue("valign", cell, rows[0], column)
-        space = sum([row.minheight for row in rows])
+        space = sum(row.minheight for row in rows)
         if valign == "bottom":
             return height - space
         if valign == "middle":
@@ -374,9 +362,12 @@ class table(object):
         headerRow = tblRow(len(columns), {"align": "center", "valign": "top", "bold": True, "header": True})
         headerRow.cells = columns
 
-        header_rows = [headerRow]
-        header_rows.extend([row for row in self.rows if self.getValue("header")])
-        last_row = header_rows[len(header_rows) - 1]
+        header_rows = [
+            headerRow,
+            *[row for row in self.rows if self.getValue("header")],
+        ]
+
+        last_row = header_rows[-1]
 
         for row in header_rows:
             out.write("  <tr>\n")
@@ -408,8 +399,7 @@ class table(object):
         for r in range(len(rows)):
             row = rows[r]
             rowattr = ""
-            cssclass = self.getValue("cssclass", row)
-            if cssclass:
+            if cssclass := self.getValue("cssclass", row):
                 rowattr += " class=\"%s\"" % cssclass
             out.write("  <tr%s>\n" % (rowattr))
             i = 0
@@ -461,10 +451,7 @@ class table(object):
         out.write(" </tbody>\n</table>\n</div>\n")
 
 def htmlPrintHeader(out, title = None):
-    if title:
-        titletag = "<title>%s</title>\n" % htmlEncode([str(title)])
-    else:
-        titletag = ""
+    titletag = "<title>%s</title>\n" % htmlEncode([str(title)]) if title else ""
     out.write("""<!DOCTYPE HTML>
 <html>
 <head>
@@ -601,15 +588,14 @@ def htmlPrintFooter(out):
 
 def getStdoutFilename():
     try:
-        if os.name == "nt":
-            import msvcrt, ctypes
-            handle = msvcrt.get_osfhandle(sys.stdout.fileno())
-            size = ctypes.c_ulong(1024)
-            nameBuffer = ctypes.create_string_buffer(size.value)
-            ctypes.windll.kernel32.GetFinalPathNameByHandleA(handle, nameBuffer, size, 4)
-            return nameBuffer.value
-        else:
+        if os.name != "nt":
             return os.readlink('/proc/self/fd/1')
+        import msvcrt, ctypes
+        handle = msvcrt.get_osfhandle(sys.stdout.fileno())
+        size = ctypes.c_ulong(1024)
+        nameBuffer = ctypes.create_string_buffer(size.value)
+        ctypes.windll.kernel32.GetFinalPathNameByHandleA(handle, nameBuffer, size, 4)
+        return nameBuffer.value
     except:
         return ""
 
@@ -619,17 +605,10 @@ def detectHtmlOutputType(requestedType):
     elif requestedType in ["html", "moinwiki"]:
         return True
     else:
-        if sys.stdout.isatty():
-            return False
+        if not sys.stdout.isatty() and (outname := getStdoutFilename()):
+            return bool(outname.endswith(".htm") or outname.endswith(".html"))
         else:
-            outname = getStdoutFilename()
-            if outname:
-                if outname.endswith(".htm") or outname.endswith(".html"):
-                    return True
-                else:
-                    return False
-            else:
-                return False
+            return False
 
 def getRelativeVal(test, test0, metric):
     if not test or not test0:
@@ -662,7 +641,7 @@ def getScore(test, test0, metric):
         return None
     s0 = float(test.get("gstddev", None))
     s1 = float(test0.get("gstddev", None))
-    s = math.sqrt(s0*s0 + s1*s1)
+    s = math.sqrt(s0**2 + s1**2)
     m0 = math.log(m0)
     m1 = math.log(m1)
     if s == 0:
@@ -719,10 +698,7 @@ def formatValue(val, metric, units = None):
         if val > 0:
             return "slower"
         #return "%.4f" % val
-    if units:
-        return "%.3f %s" % (val, units)
-    else:
-        return "%.3f" % val
+    return "%.3f %s" % (val, units) if units else "%.3f" % val
 
 if __name__ == "__main__":
     if len(sys.argv) < 2:

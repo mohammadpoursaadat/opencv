@@ -25,8 +25,7 @@ def load_html_file(file_dir):
     data = re.sub(r'([ ]+)(\<)', lambda match: ('!space!' * len(match.group(1))) + match.group(2), data)
     if os.name == 'nt' or sys.version_info[0] == 3:
         data = data.encode('utf-8', 'ignore')
-    soup = BeautifulSoup(data, 'html.parser')
-    return soup
+    return BeautifulSoup(data, 'html.parser')
 
 def update_html(file, soup):
     s = str(soup)
@@ -45,7 +44,7 @@ def insert_python_signatures(python_signatures, symbols_dict, filepath):
         if anchor in symbols_dict:
             s = symbols_dict[anchor]
             logging.info('Process: %r' % s)
-            if s.type == 'fn' or s.type == 'method':
+            if s.type in ['fn', 'method']:
                 process_fn(soup, e, python_signatures[s.cppname], s)
             elif s.type == 'const':
                 process_const(soup, e, python_signatures[s.cppname], s)
@@ -68,14 +67,17 @@ def process_fn(soup, anchor, python_signature, symbol):
 def process_const(soup, anchor, python_signature, symbol):
     try:
         #pprint(anchor.parent)
-        description = append(soup.new_tag('div', **{'class' : ['python_language']}),
-            'Python: ' + python_signature[0]['name'])
+        description = append(
+            soup.new_tag('div', **{'class': ['python_language']}),
+            f'Python: {python_signature[0]["name"]}',
+        )
+
         old = anchor.find_next_sibling('div', class_='python_language')
         if old is None:
             anchor.parent.append(description)
         else:
             old.replace_with(description)
-        #pprint(anchor.parent)
+            #pprint(anchor.parent)
     except:
         logging.error("Can't process: %s" % symbol)
         traceback.print_exc()
@@ -115,7 +117,7 @@ def add_signature_to_table(soup, table, signature, language, type):
         row.append(soup.new_tag('td')) # return values
         row.append(soup.new_tag('td')) # '='
 
-    row.append(append(soup.new_tag('td'), signature['name'] + '('))
+    row.append(append(soup.new_tag('td'), f'{signature["name"]}('))
     row.append(append(soup.new_tag('td', **{'class': 'paramname'}), signature['arg']))
     row.append(append(soup.new_tag('td'), ')'))
     table.append(row)

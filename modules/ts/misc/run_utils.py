@@ -59,21 +59,19 @@ def execute(cmd, silent=False, cwd=".", env=None):
 
 def isColorEnabled(args):
     usercolor = [a for a in args if a.startswith("--gtest_color=")]
-    return len(usercolor) == 0 and sys.stdout.isatty() and hostos != "nt"
+    return not usercolor and sys.stdout.isatty() and hostos != "nt"
 
 
 def getPlatformVersion():
     mv = platform.mac_ver()
     if mv[0]:
-        return "Darwin" + mv[0]
-    else:
-        wv = platform.win32_ver()
-        if wv[0]:
-            return "Windows" + wv[0]
-        else:
-            lv = platform.linux_distribution()
-            if lv[0]:
-                return lv[0] + lv[1]
+        return f'Darwin{mv[0]}'
+    wv = platform.win32_ver()
+    if wv[0]:
+        return f'Windows{wv[0]}'
+    lv = platform.linux_distribution()
+    if lv[0]:
+        return lv[0] + lv[1]
     return None
 
 
@@ -113,15 +111,13 @@ class CMakeCache:
                 if not ll or ll.startswith("#"):
                     continue
                 for p in parse_patterns:
-                    match = p["pattern"].match(ll)
-                    if match:
+                    if match := p["pattern"].match(ll):
                         value = match.groups()[0]
                         if value and not value.endswith("-NOTFOUND"):
                             setattr(self, p["name"], value)
                             # log.debug("cache value: %s = %s", p["name"], value)
 
-                match = rx.search(ll)
-                if match:
+                if match := rx.search(ll):
                     module_paths[match.group(1)] = match.group(2)
 
         if not self.tests_dir:
@@ -148,7 +144,7 @@ class CMakeCache:
         if self.tests_dir and os.path.isdir(self.tests_dir):
             d = os.path.abspath(self.tests_dir)
             files = glob.glob(os.path.join(d, mask))
-            if not self.getOS() == "android" and self.withJava():
+            if self.getOS() != "android" and self.withJava():
                 files.append("java")
             if self.withPython2():
                 files.append("python2")
@@ -170,10 +166,7 @@ class CMakeCache:
         return self.python3 == 'ON'
 
     def getOS(self):
-        if self.android_executable:
-            return "android"
-        else:
-            return hostos
+        return "android" if self.android_executable else hostos
 
 
 class TempEnvDir:
