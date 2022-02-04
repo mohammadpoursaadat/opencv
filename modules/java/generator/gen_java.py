@@ -102,9 +102,7 @@ def mkdir_p(path):
     try:
         os.makedirs(path)
     except OSError as exc:
-        if exc.errno == errno.EEXIST and os.path.isdir(path):
-            pass
-        else:
+        if exc.errno != errno.EEXIST or not os.path.isdir(path):
             raise
 
 T_JAVA_START_INHERITED = read_contents(os.path.join(SCRIPT_DIR, 'templates/java_class_inherited.prolog'))
@@ -119,11 +117,7 @@ class GeneralInfo():
         # parse doxygen comments
         self.params={}
         self.annotation=[]
-        if type == "class":
-            docstring="// C++: class " + self.name + "\n"
-        else:
-            docstring=""
-
+        docstring = f'// C++: class {self.name}' + "\n" if type == "class" else ""
         if len(decl)>5 and decl[5]:
             doc = decl[5]
 
@@ -146,7 +140,7 @@ class GeneralInfo():
         for namespace in sorted(namespaces, key=len, reverse=True):
             if name.startswith(namespace + "."):
                 spaceName = namespace
-                localName = name.replace(namespace + ".", "")
+                localName = name.replace(f'{namespace}.', "")
                 break
         pieces = localName.split(".")
         if len(pieces) > 2: # <class>.<class>.<class>.<name>
@@ -182,10 +176,7 @@ class ConstInfo(GeneralInfo):
                                                                  manual="(manual)" if self.addedManually else "")
 
     def isIgnored(self):
-        for c in const_ignore_list:
-            if re.match(c, self.name):
-                return True
-        return False
+        return any(re.match(c, self.name) for c in const_ignore_list)
 
 def normalize_field_name(name):
     return name.replace(".","_").replace("[","").replace("]","").replace("_getNativeObjAddr()","_nativeObj")
@@ -242,8 +233,12 @@ class ClassInfo(GeneralInfo):
         return Template("CLASS $namespace::$classpath.$name : $base").substitute(**self.__dict__)
 
     def getAllImports(self, module):
-        return ["import %s;" % c for c in sorted(self.imports) if not c.startswith('org.opencv.'+module)
-            and (not c.startswith('java.lang.') or c.count('.') != 2)]
+        return [
+            "import %s;" % c
+            for c in sorted(self.imports)
+            if not c.startswith(f'org.opencv.{module}')
+            and ((not c.startswith('java.lang.') or c.count('.') != 2))
+        ]
 
     def addImports(self, ctype):
         if ctype in type_dict:
@@ -257,8 +252,7 @@ class ClassInfo(GeneralInfo):
                     self.imports.add("org.opencv.core.Mat")
 
     def getAllMethods(self):
-        result = []
-        result.extend([fi for fi in sorted(self.methods) if fi.isconstructor])
+        result = [fi for fi in sorted(self.methods) if fi.isconstructor]
         result.extend([fi for fi in sorted(self.methods) if not fi.isconstructor])
         return result
 
@@ -286,11 +280,10 @@ class ClassInfo(GeneralInfo):
         self.cpp_code = StringIO()
         if self.base:
             self.j_code.write(T_JAVA_START_INHERITED)
+        elif self.name != Module:
+            self.j_code.write(T_JAVA_START_ORPHAN)
         else:
-            if self.name != Module:
-                self.j_code.write(T_JAVA_START_ORPHAN)
-            else:
-                self.j_code.write(T_JAVA_START_MODULE)
+            self.j_code.write(T_JAVA_START_MODULE)
         # misc handling
         if self.name == Module:
           for i in module_imports or []:
@@ -427,21 +420,23 @@ class JavaWrapperGenerator(object):
 
         # class props
         for p in decl[3]:
-            if True: #"vector" not in p[0]:
-                classinfo.props.append( ClassPropInfo(p) )
-            else:
-                logging.warning("Skipped property: [%s]" % name, p)
-
+            classinfo.props.append( ClassPropInfo(p) )
         if classinfo.base:
             classinfo.addImports(classinfo.base)
-        type_dict.setdefault("Ptr_"+name, {}).update(
-            { "j_type" : classinfo.jname,
-              "jn_type" : "long", "jn_args" : (("__int64", ".getNativeObjAddr()"),),
-              "jni_name" : "*((Ptr<"+classinfo.fullName(isCPP=True)+">*)%(n)s_nativeObj)", "jni_type" : "jlong",
-              "suffix" : "J",
-              "j_import" : "org.opencv.%s.%s" % (self.module, classinfo.jname)
+        type_dict.setdefault(f'Ptr_{name}', {}).update(
+            {
+                "j_type": classinfo.jname,
+                "jn_type": "long",
+                "jn_args": (("__int64", ".getNativeObjAddr()"),),
+                "jni_name": "*((Ptr<"
+                + classinfo.fullName(isCPP=True)
+                + ">*)%(n)s_nativeObj)",
+                "jni_type": "jlong",
+                "suffix": "J",
+                "j_import": "org.opencv.%s.%s" % (self.module, classinfo.jname),
             }
         )
+
         logging.info('ok: class %s, name: %s, base: %s', classinfo, name, classinfo.base)
 
     def add_const(self, decl, enumType=None): # [ "const cname", val, [], [] ]
@@ -451,12 +446,11 @@ class JavaWrapperGenerator(object):
         else:
             if not self.isWrapped(constinfo.classname):
                 logging.info('class not found: %s', constinfo)
-                constinfo.name = constinfo.classname + '_' + constinfo.name
+                constinfo.name = f'{constinfo.classname}_{constinfo.name}'
                 constinfo.classname = ''
 
             ci = self.getClass(constinfo.classname)
-            duplicate = ci.getConst(constinfo.name)
-            if duplicate:
+            if duplicate := ci.getConst(constinfo.name):
                 if duplicate.addedManually:
                     logging.info('manual: %s', constinfo)
                 else:
@@ -512,7 +506,7 @@ class JavaWrapperGenerator(object):
         # TODO: support UMat versions of declarations (implement UMat-wrapper for Java)
         parser = hdr_parser.CppHeaderParser(generate_umat_decls=False)
 
-        self.add_class( ['class ' + self.Module, '', [], []] ) # [ 'class/struct cname', ':bases', [modlist] [props] ]
+        self.add_class([f'class {self.Module}', '', [], []])
 
         # scan the headers and build more descriptive maps of classes, consts, functions
         includes = []
@@ -554,7 +548,7 @@ class JavaWrapperGenerator(object):
             self.save("%s/%s/%s.java" % (output_java_path, module, ci.jname), classJavaCode)
             moduleCppCode.write(ci.generateCppCode())
             ci.cleanupCodeStreams()
-        cpp_file = os.path.abspath(os.path.join(output_jni_path, module + ".inl.hpp"))
+        cpp_file = os.path.abspath(os.path.join(output_jni_path, f'{module}.inl.hpp'))
         self.cpp_files.append(cpp_file)
         self.save(cpp_file, T_CPP_MODULE.substitute(m = module, M = module.upper(), code = moduleCppCode.getvalue(), includes = "\n".join(includes)))
         self.save(os.path.join(output_path, module+".txt"), self.makeReport())

@@ -50,9 +50,8 @@ def check_dir(d, create=False, clean=False):
         if clean:
             for x in glob.glob(os.path.join(d, "*")):
                 rm_one(x)
-    else:
-        if create:
-            os.makedirs(d)
+    elif create:
+        os.makedirs(d)
     return d
 
 def check_executable(cmd):
@@ -102,11 +101,10 @@ def copytree_smart(src, dst):
                     copy_recurse(os.path.join(subdir, item))
             elif os.path.isfile(s):
                 shutil.copy2(s, d)
-        else:
-            if os.path.isdir(s):
-                shutil.copytree(s, d)
-            elif os.path.isfile(s):
-                shutil.copy2(s, d)
+        elif os.path.isdir(s):
+            shutil.copytree(s, d)
+        elif os.path.isfile(s):
+            shutil.copy2(s, d)
     copy_recurse('')
 
 #===================================================================================================
@@ -132,7 +130,7 @@ class ABI:
     def __str__(self):
         return "%s (%s)" % (self.name, self.toolchain)
     def haveIPP(self):
-        return self.name == "x86" or self.name == "x86_64"
+        return self.name in ["x86", "x86_64"]
 
 #===================================================================================================
 
@@ -146,12 +144,12 @@ class Builder:
         self.docdest = check_dir(os.path.join(self.workdir, 'OpenCV-android-sdk', 'sdk', 'java', 'javadoc'), create=True, clean=True)
         self.extra_packs = []
         self.opencv_version = determine_opencv_version(os.path.join(self.opencvdir, "modules", "core", "include", "opencv2", "core", "version.hpp"))
-        self.use_ccache = False if config.no_ccache else True
+        self.use_ccache = not config.no_ccache
         self.cmake_path = self.get_cmake()
         self.ninja_path = self.get_ninja()
-        self.debug = True if config.debug else False
-        self.debug_info = True if config.debug_info else False
-        self.no_samples_build = True if config.no_samples_build else False
+        self.debug = bool(config.debug)
+        self.debug_info = bool(config.debug_info)
+        self.no_samples_build = bool(config.no_samples_build)
 
     def get_cmake(self):
         if not self.config.use_android_buildtools and check_executable(['cmake', '--version']):
@@ -160,8 +158,13 @@ class Builder:
         # look to see if Android SDK's cmake is installed
         android_cmake = os.path.join(os.environ['ANDROID_SDK'], 'cmake')
         if os.path.exists(android_cmake):
-            cmake_subdirs = [f for f in os.listdir(android_cmake) if check_executable([os.path.join(android_cmake, f, 'bin', 'cmake'), '--version'])]
-            if len(cmake_subdirs) > 0:
+            if cmake_subdirs := [
+                f
+                for f in os.listdir(android_cmake)
+                if check_executable(
+                    [os.path.join(android_cmake, f, 'bin', 'cmake'), '--version']
+                )
+            ]:
                 # there could be more than one - just take the first one
                 cmake_from_sdk = os.path.join(android_cmake, cmake_subdirs[0], 'bin', 'cmake')
                 log.info("Using cmake from Android SDK: %s", cmake_from_sdk)
@@ -175,8 +178,13 @@ class Builder:
         # Android SDK's cmake includes a copy of ninja - look to see if its there
         android_cmake = os.path.join(os.environ['ANDROID_SDK'], 'cmake')
         if os.path.exists(android_cmake):
-            cmake_subdirs = [f for f in os.listdir(android_cmake) if check_executable([os.path.join(android_cmake, f, 'bin', 'ninja'), '--version'])]
-            if len(cmake_subdirs) > 0:
+            if cmake_subdirs := [
+                f
+                for f in os.listdir(android_cmake)
+                if check_executable(
+                    [os.path.join(android_cmake, f, 'bin', 'ninja'), '--version']
+                )
+            ]:
                 # there could be more than one - just take the first one
                 ninja_from_sdk = os.path.join(android_cmake, cmake_subdirs[0], 'bin', 'ninja')
                 log.info("Using ninja from Android SDK: %s", ninja_from_sdk)
@@ -338,17 +346,23 @@ if __name__ == "__main__":
     if args.sdk_path is not None:
         os.environ["ANDROID_SDK"] = args.sdk_path
 
-    if not 'ANDROID_HOME' in os.environ and 'ANDROID_SDK' in os.environ:
+    if 'ANDROID_HOME' not in os.environ and 'ANDROID_SDK' in os.environ:
         os.environ['ANDROID_HOME'] = os.environ["ANDROID_SDK"]
 
-    if not 'ANDROID_SDK' in os.environ:
+    if 'ANDROID_SDK' not in os.environ:
         raise Fail("SDK location not set. Either pass --sdk_path or set ANDROID_SDK environment variable")
 
     # look for an NDK installed with the Android SDK
-    if not 'ANDROID_NDK' in os.environ and 'ANDROID_SDK' in os.environ and os.path.exists(os.path.join(os.environ["ANDROID_SDK"], 'ndk-bundle')):
+    if (
+        'ANDROID_NDK' not in os.environ
+        and 'ANDROID_SDK' in os.environ
+        and os.path.exists(
+            os.path.join(os.environ["ANDROID_SDK"], 'ndk-bundle')
+        )
+    ):
         os.environ['ANDROID_NDK'] = os.path.join(os.environ["ANDROID_SDK"], 'ndk-bundle')
 
-    if not 'ANDROID_NDK' in os.environ:
+    if 'ANDROID_NDK' not in os.environ:
         raise Fail("NDK location not set. Either pass --ndk_path or set ANDROID_NDK environment variable")
 
     if not check_executable(['ccache', '--version']):

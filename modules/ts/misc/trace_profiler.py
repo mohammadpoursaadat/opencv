@@ -65,9 +65,9 @@ def getCXXFunctionName(spec):
         depth = 0
         while pos >= 0:
             if spec[pos] == ')':
-                depth = depth + 1
+                depth += 1
             elif spec[pos] == '(':
-                depth = depth - 1
+                depth -= 1
                 if depth == 0:
                     if pos == 0 or spec[pos - 1] in ['#', ':']:
                         res = dropParams(spec[pos+1:-1])
@@ -190,7 +190,7 @@ class Trace:
             return
         extra_opts = {}
         for e in opts[5:]:
-            if not '=' in e:
+            if '=' not in e:
                 continue
             (k, v) = e.split('=')
             extra_opts[k] = tryNum(v)
@@ -208,7 +208,7 @@ class Trace:
         thread_stack = None
         currentTask = (None, None)
         if threadID is not None:
-            if not threadID in self.threads_stack:
+            if threadID not in self.threads_stack:
                 thread_stack = deque()
                 self.threads_stack[threadID] = thread_stack
             else:
@@ -216,7 +216,7 @@ class Trace:
             currentTask = None if not thread_stack else thread_stack[-1]
         t = (threadID, taskID)
         if opts[0] == 'b':
-            assert not t in self.tasks, "Duplicate task: " + str(t) + repr(self.tasks[t])
+            assert t not in self.tasks, "Duplicate task: " + str(t) + repr(self.tasks[t])
             task = self.TraceTask(threadID, taskID, locationID, ts)
             self.tasks[t] = task
             self.tasks_list.append(task)
@@ -271,8 +271,7 @@ class Trace:
         dprint("Calculate total times")
 
         for task in self.tasks_list:
-            parentTask = self.getParentTask(task)
-            if parentTask:
+            if parentTask := self.getParentTask(task):
                 parentTask.selfDuration = parentTask.selfDuration - task.duration
                 parentTask.childTask.append(task)
                 timeIPP = task.selfTimeIPP
@@ -299,12 +298,12 @@ class Trace:
         for task in self.tasks_list:
             if task.locationID == parallel_for_location:
                 task.selfDuration = 0
-                childDuration = sum([t.duration for t in task.childTask])
+                childDuration = sum(t.duration for t in task.childTask)
                 if task.duration == 0 or childDuration == 0:
                     continue
                 timeCoef = task.duration / float(childDuration)
-                childTimeIPP = sum([t.totalTimeIPP for t in task.childTask])
-                childTimeOpenCL = sum([t.totalTimeOpenCL for t in task.childTask])
+                childTimeIPP = sum(t.totalTimeIPP for t in task.childTask)
+                childTimeOpenCL = sum(t.totalTimeOpenCL for t in task.childTask)
                 if childTimeIPP == 0 and childTimeOpenCL == 0:
                     continue
                 timeIPP = childTimeIPP * timeCoef
@@ -384,9 +383,7 @@ class Trace:
             calls_sorted = calls_sorted[:max_entries]
 
         def formatPercents(p):
-            if p is not None:
-                return "{:>3d}".format(int(p*100))
-            return ''
+            return "{:>3d}".format(int(p*100)) if p is not None else ''
 
         name_width = 70
         timestamp_width = 12

@@ -108,7 +108,7 @@ class TestInfo(object):
             frequency = self.metrix.get("frequency", 1.0) or 1.0
             if units == "ms":
                 scale = 1000.0
-            if units == "us" or units == "mks":  # mks is typo error for microsecond (<= OpenCV 3.4)
+            if units in ["us", "mks"]:  # mks is typo error for microsecond (<= OpenCV 3.4)
                 scale = 1000000.0
             if units == "ns":
                 scale = 1000000000.0
@@ -160,25 +160,21 @@ class TestInfo(object):
         if r != 0:
             return r
         if self.type_param:
-            if other.type_param:
-                r = cmp(self.type_param, other.type_param);
-                if r != 0:
-                     return r
-            else:
+            if not other.type_param:
                 return -1
-        else:
-            if other.type_param:
-                return 1
+            r = cmp(self.type_param, other.type_param);
+            if r != 0:
+                 return r
+        elif other.type_param:
+            return 1
         if self.value_param:
-            if other.value_param:
-                r = cmp(self.value_param, other.value_param);
-                if r != 0:
-                     return r
-            else:
+            if not other.value_param:
                 return -1
-        else:
-            if other.value_param:
-                return 1
+            r = cmp(self.value_param, other.value_param);
+            if r != 0:
+                 return r
+        elif other.value_param:
+            return 1
         return 0
 
 # This is a Sequence for compatibility with old scripts,

@@ -155,13 +155,15 @@ class Collector(object):
                     logging.warning('failed to match properties to a configuration: %s',
                         Collector.__format_config_cache_key(props_key))
 
-            else:
-                same_config_props = [it[0] for it in self.__config_cache.iteritems() if it[1] == configuration]
-                if len(same_config_props) > 0:
-                    logging.warning('property set %s matches the same configuration %r as property set %s',
-                        Collector.__format_config_cache_key(props_key),
-                        configuration,
-                        Collector.__format_config_cache_key(same_config_props[0]))
+            elif same_config_props := [
+                it[0]
+                for it in self.__config_cache.iteritems()
+                if it[1] == configuration
+            ]:
+                logging.warning('property set %s matches the same configuration %r as property set %s',
+                    Collector.__format_config_cache_key(props_key),
+                    configuration,
+                    Collector.__format_config_cache_key(same_config_props[0]))
 
             self.__config_cache[props_key] = configuration
 

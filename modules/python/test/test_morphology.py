@@ -33,7 +33,7 @@ class morphology_test(NewOpenCVTests):
             iters = 1
             opers = cur_mode.split('/')
             if len(opers) > 1:
-                sz = sz - 10
+                sz -= 10
                 op = opers[sz > 0]
                 sz = abs(sz)
             else:
